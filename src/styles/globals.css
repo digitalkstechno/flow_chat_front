@@ -1,0 +1,237 @@
+/* Must come BEFORE @import "tailwindcss" */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,300;0,400;0,600;0,700;0,800;0,900;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── WhatsApp-Inspired Design Tokens ── */
+:root {
+  /* Brand Colors (WhatsApp Green / Teal Palette) */
+  --color-aubergine-core: #128C7E;
+  --color-midnight-plum: #075E54;
+  --color-eggplant-ink: #053e37;
+  --color-plum-shadow: #128C7E;
+  --color-iris-mid: #25D366;
+  --color-lavender-wash: #e7fce3;
+  --color-lilac-veil: #d1f9cc;
+  --color-iris-edge: #a9ea9f;
+  --color-violet-glow: #25d366;
+  --color-magenta-pulse: #128c7e;
+  --color-plum-deep: #075e54;
+  --color-cream-canvas: #f4fbf3;
+  --color-pure-white: #ffffff;
+  --color-graphite: #2e3b33;
+  --color-steel: #55665c;
+  --color-fog: #86968c;
+  --color-ash: #e7ece9;
+  --color-slate: #8696a0;
+
+  /* Gradients */
+  --gradient-ember-to-violet: linear-gradient(104deg, #075e54 9.56%, #25d366 102.66%);
+
+  /* Typography */
+  --font-display: 'Archivo', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Layout */
+  --page-max-width: 1200px;
+  --section-gap: 96px;
+  --card-padding: 32px;
+
+  /* Border Radius */
+  --radius-btn: 4px;
+  --radius-card: 16px;
+  --radius-pill: 48px;
+
+  /* Shadows */
+  --shadow-xl: rgba(0, 0, 0, 0.08) 0px 0px 32px 0px;
+  --shadow-lg: rgba(0, 0, 0, 0.08) 0px 5px 20px 0px;
+
+  /* Base Application Theme Variables */
+  --background: #ffffff;
+  --foreground: #111b21;
+  --card-bg: #f8fafc;
+  --card-border: rgba(0,0,0,0.06);
+  --nav-bg: rgba(255, 255, 255, 0.85);
+  --nav-border: rgba(0,0,0,0.06);
+  --text-muted: rgba(17, 27, 33, 0.6);
+  --accent: #25d366;
+  --accent-foreground: #ffffff;
+}
+
+.dark {
+  /* Base Application Theme Variables (Dark Mode) */
+  --background: #0b141a;
+  --foreground: #e9edef;
+  --card-bg: #111b21;
+  --card-border: rgba(255, 255, 255, 0.05);
+  --nav-bg: rgba(11, 20, 26, 0.85);
+  --nav-border: rgba(255, 255, 255, 0.05);
+  --text-muted: rgba(233, 237, 239, 0.6);
+  --accent: #00a884;
+  --accent-foreground: #ffffff;
+
+  --color-cream-canvas: #080b0f;
+  --color-midnight-plum: #e9edef;
+  --color-graphite: #aebac1;
+  --color-steel: #8696a0;
+  --color-fog: #667781;
+  --color-ash: rgba(0, 168, 132, 0.12);
+  --color-pure-white: rgba(7, 94, 84, 0.35);
+  --color-lavender-wash: rgba(7, 94, 84, 0.35);
+  --color-lilac-veil: rgba(7, 94, 84, 0.30);
+  --color-iris-edge: rgba(0, 168, 132, 0.18);
+  --color-aubergine-core: #00a884;
+  --color-iris-mid: #00e676;
+  --color-plum-deep: #051d18;
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card-bg);
+  --color-border: var(--card-border);
+  --font-sans: var(--font-body);
+  --font-mono: 'Courier New', monospace;
+
+  /* Remap standard tailwind blue and indigo colors to WhatsApp greens so no UI code changes are needed */
+  --color-blue-50: #efe;
+  --color-blue-100: #dfd;
+  --color-blue-200: #bfb;
+  --color-blue-500: #25d366;
+  --color-blue-600: #00a884;
+  --color-blue-700: #075e54;
+  --color-blue-800: #128c7e;
+  --color-blue-650: #00a884;
+  
+  --color-indigo-50: #e6fcf4;
+  --color-indigo-100: #c2f7e4;
+  --color-indigo-200: #99f2d3;
+  --color-indigo-500: #00a884;
+  --color-indigo-600: #128c7e;
+  --color-indigo-700: #075e54;
+  --color-indigo-650: #128c7e;
+
+  /* Custom 650 color utilities to match legacy theme configs under Tailwind 4 */
+  --color-red-650: #c53030;
+  --color-emerald-650: #04825f;
+  --color-amber-650: #c26107;
+  --color-purple-650: #00a884;
+  --color-slate-650: #3b4a5f;
+  --color-neutral-650: #494949;
+}
+
+/* ── Base Reset ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scroll Reveal ── */
+.reveal,
+.reveal-left,
+.reveal-right,
+.reveal-scale {
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal          { opacity: 0; transform: translateY(30px); }
+.reveal-left     { opacity: 0; transform: translateX(-30px); }
+.reveal-right    { opacity: 0; transform: translateX(30px); }
+.reveal-scale    { opacity: 0; transform: scale(0.95); }
+
+.reveal.revealed,
+.reveal-left.revealed,
+.reveal-right.revealed,
+.reveal-scale.revealed {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* Stagger */
+.stagger-1 { transition-delay: 0.08s; }
+.stagger-2 { transition-delay: 0.16s; }
+.stagger-3 { transition-delay: 0.24s; }
+.stagger-4 { transition-delay: 0.32s; }
+.stagger-5 { transition-delay: 0.40s; }
+
+/* ── Keyframe Animations ── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-12px); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeLeft {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulseSlow {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+@keyframes bounce-dot {
+  0%, 60%, 100% { transform: translateY(0); }
+  30%            { transform: translateY(-5px); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+/* ── Utility Classes ── */
+.animate-float      { animation: float 6s ease-in-out infinite; }
+.animate-pulse-slow { animation: pulseSlow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.animate-fade-up    { animation: fadeUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-fade-left  { animation: fadeLeft 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-spin       { animation: spin 1s linear infinite; }
+.animate-ping       { animation: ping 1s ease-in-out infinite; }
+.animate-bounce-dot { animation: bounce-dot 0.8s ease-in-out infinite; }
+
+/* ── Custom Scrollbar ── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0, 168, 132, 0.25); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 168, 132, 0.45); }
+
+/* ── Selection Color ── */
+::selection {
+  background: var(--color-iris-edge);
+  color: var(--color-eggplant-ink);
+}
+
+/* ── Responsive Helpers ── */
+.show-mobile   { display: none !important; }
+.hidden-mobile { display: flex !important; }
+
+@media (max-width: 768px) {
+  .show-mobile   { display: flex !important; }
+  .hidden-mobile { display: none !important; }
+}
