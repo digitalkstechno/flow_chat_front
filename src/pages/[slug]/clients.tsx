@@ -11,6 +11,23 @@ import { getClients, createClient, updateClient, deleteClient, Client } from '@/
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// ─── Format Helpers ───────────────────────────────────────────────────────────
+
+function formatDateOnly(val: any): string {
+    if (!val) return '';
+    try {
+        const d = new Date(val);
+        if (isNaN(d.getTime())) return '';
+        const day = d.getDate();
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = monthNames[d.getMonth()];
+        const year = d.getFullYear();
+        return `${day} ${month}, ${year}`;
+    } catch {
+        return '';
+    }
+}
+
 interface CustomerGroup {
     _id: string;
     name: string;
@@ -650,7 +667,7 @@ export default function ClientsPage() {
                                 {[
                                     { label: 'Phone', value: viewClient.phone },
                                     { label: 'Email', value: viewClient.email || '—' },
-                                    { label: 'Added On', value: viewClient.addedOn ? new Date(viewClient.addedOn).toLocaleDateString() : '—' },
+                                    { label: 'Added On', value: viewClient.addedOn ? formatDateOnly(viewClient.addedOn) : '—' },
                                 ].map(row => (
                                     <div key={row.label} className="flex items-center justify-between py-2.5 border-b border-slate-50 dark:border-zinc-800/60">
                                         <span className="text-xs font-bold text-slate-400 dark:text-zinc-500">{row.label}</span>

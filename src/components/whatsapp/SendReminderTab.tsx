@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Send, Calendar, Clock, Repeat, ChevronDown, Check, Loader2, Play, Users, Hash, Phone, FileText, Trash2, CheckCircle2, ShieldAlert, X, Plus, ChevronRight, ChevronLeft, Search, MessageSquare } from 'lucide-react';
 import { api } from '@/services/apiClient';
 import LivePreview from './LivePreview';
@@ -37,11 +38,108 @@ function Select({ className, children, ...props }: React.SelectHTMLAttributes<HT
     );
 }
 
+function formatDateTime(val: any): string {
+    if (!val) return '';
+    try {
+        const d = new Date(val);
+        if (isNaN(d.getTime())) return '';
+        const day = d.getDate();
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = monthNames[d.getMonth()];
+        const year = d.getFullYear();
+        
+        let hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        
+        return `${day} ${month}, ${year}, ${hours}:${minutes} ${ampm}`;
+    } catch {
+        return '';
+    }
+}
+
 interface CustomerGroup {
     _id: string;
     name: string;
     color: string;
     membersCount?: number;
+}
+
+function MultipleRecipientsBadge({ recipients }: { recipients: Array<{ name: string; phone?: string }> }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+    const visibleRecipients = recipients.slice(0, 3);
+    const extraCount = recipients.length - 3;
+
+    const handleMouseEnter = (e: React.MouseEvent) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setCoords({
+            top: rect.top + window.scrollY - 8,
+            left: rect.left + window.scrollX + rect.width / 2
+        });
+        setIsOpen(true);
+    };
+
+    const handleMouseLeave = () => {
+        setIsOpen(false);
+        setCoords(null);
+    };
+
+    return (
+        <div className="relative inline-flex items-center gap-2" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+            {/* Avatar Stack */}
+            <div className="flex -space-x-1.5">
+                {visibleRecipients.map((rp, idx) => {
+                    const initials = rp.name.slice(0, 2).toUpperCase();
+                    const colors = [
+                        'from-blue-400 to-indigo-500',
+                        'from-emerald-400 to-teal-500',
+                        'from-purple-400 to-pink-500',
+                    ];
+                    return (
+                        <div key={idx} className={`w-5.5 h-5.5 rounded-full bg-gradient-to-br ${colors[idx % colors.length]} flex items-center justify-center text-white text-[8px] font-black border border-white dark:border-[#0f0f1c] shrink-0`}>
+                            {initials}
+                        </div>
+                    );
+                })}
+                {extraCount > 0 && (
+                    <div className="w-5.5 h-5.5 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-slate-500 dark:text-zinc-400 text-[8px] font-black border border-white dark:border-[#0f0f1c] shrink-0">
+                        +{extraCount}
+                    </div>
+                )}
+            </div>
+
+            {/* Label Pill */}
+            <span className="px-2 py-0.5 bg-slate-50 hover:bg-slate-100 dark:bg-zinc-900/60 dark:hover:bg-zinc-800 text-[10px] font-bold text-slate-600 dark:text-zinc-300 rounded-lg border border-slate-150 dark:border-zinc-800 transition-colors cursor-help">
+                {recipients.length} Recipients
+            </span>
+
+            {/* Popover / Tooltip rendered via Portal */}
+            {isOpen && coords && typeof document !== 'undefined' && createPortal(
+                <div className="fixed z-[9999] w-64 p-3 bg-white dark:bg-zinc-900 border border-slate-150 dark:border-zinc-850 rounded-2xl shadow-xl animate-fade-in text-left pointer-events-none"
+                    style={{
+                        top: `${coords.top}px`,
+                        left: `${coords.left}px`,
+                        transform: 'translate(-50%, -100%)'
+                    }}>
+                    <p className="text-[10px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2">Campaign Recipients ({recipients.length})</p>
+                    <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 scrollbar-thin">
+                        {recipients.map((rp, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-slate-50 dark:border-zinc-800/40 last:border-b-0">
+                                <span className="font-bold text-slate-700 dark:text-zinc-200 truncate pr-2">{rp.name}</span>
+                                {rp.phone && <span className="text-[10px] font-mono text-slate-450 dark:text-zinc-500 shrink-0">{rp.phone}</span>}
+                            </div>
+                        ))}
+                    </div>
+                    {/* Tooltip pointer arrow */}
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full -translate-y-px w-2 h-2 bg-white dark:bg-zinc-900 border-r border-b border-slate-150 dark:border-zinc-850 rotate-45" />
+                </div>,
+                document.body
+            )}
+        </div>
+    );
 }
 
 interface SendReminderTabProps {
@@ -289,6 +387,8 @@ export default function SendReminderTab({
 
         setFormLoading(true);
         try {
+            const campaignId = 'camp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
+
             const basePayload = {
                 title: title.trim() || `${templateName} Reminder`,
                 recipientType: 'customers',
@@ -298,6 +398,7 @@ export default function SendReminderTab({
                 headerLink: ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat) ? headerLink : undefined,
                 headerFormat: ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat) ? headerFormat : 'NONE',
                 scheduledAt: new Date(`${scheduledDate}T${scheduledTime}`),
+                campaignId,
                 repeat: {
                     enabled: repeatEnabled,
                     frequency: repeatEnabled ? repeatFrequency : undefined,
@@ -470,6 +571,66 @@ export default function SendReminderTab({
     })();
     const isStep3Valid = templateName !== '' && scheduledDate !== '' && scheduledTime !== '' && (!repeatEnabled || repeatInterval >= 1) && (!['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat) || headerLink !== '');
 
+    // Group reminders by campaignId (or title + scheduledAt fallback)
+    const groupedReminders = (() => {
+        const groupsMap: Record<string, {
+            _id: string;
+            title: string;
+            campaignId?: string;
+            recipientType: string;
+            recipients: Array<{ name: string; phone?: string; customerId?: string }>;
+            templateName: string;
+            languageCode?: string;
+            parameters?: string[];
+            headerLink?: string;
+            headerFormat?: string;
+            scheduledAt: string;
+            status: 'Scheduled' | 'Pending' | 'Sent' | 'Failed';
+            repeat?: any;
+        }> = {};
+
+        (Array.isArray(reminders) ? reminders : []).forEach(r => {
+            const key = r.campaignId || `${r.title}_${new Date(r.scheduledAt).getTime()}`;
+            
+            const name = r.recipientType === 'new' ? (r.newName || 'Customer') :
+                         r.recipientType === 'groups' ? r.groupName :
+                         r.customer?.fullName || 'Client';
+            const phone = r.recipientType === 'new' ? r.newPhone :
+                          r.customer?.phone;
+            const customerId = r.customer?._id || r.customer;
+
+            if (!groupsMap[key]) {
+                groupsMap[key] = {
+                    _id: r._id,
+                    title: r.title,
+                    campaignId: r.campaignId,
+                    recipientType: r.recipientType,
+                    recipients: [{ name, phone, customerId }],
+                    templateName: r.templateName,
+                    languageCode: r.languageCode,
+                    parameters: r.parameters,
+                    headerLink: r.headerLink,
+                    headerFormat: r.headerFormat,
+                    scheduledAt: r.scheduledAt,
+                    status: r.status,
+                    repeat: r.repeat
+                };
+            } else {
+                groupsMap[key].recipients.push({ name, phone, customerId });
+                const currentStatus = groupsMap[key].status;
+                if (currentStatus !== 'Failed') {
+                    if (r.status === 'Failed') {
+                        groupsMap[key].status = 'Failed';
+                    } else if (currentStatus === 'Sent' && r.status === 'Scheduled') {
+                        groupsMap[key].status = 'Scheduled';
+                    }
+                }
+            }
+        });
+
+        return Object.values(groupsMap).sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime());
+    })();
+
     return (
         <div className="space-y-6">
 
@@ -485,7 +646,7 @@ export default function SendReminderTab({
                         <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
                         <span className="text-xs font-medium">Loading pipelines...</span>
                     </div>
-                ) : reminders.length === 0 ? (
+                ) : groupedReminders.length === 0 ? (
                     <div className="text-center py-16">
                         <FileText className="w-8 h-8 text-neutral-350 dark:text-neutral-600 mx-auto mb-3" />
                         <p className="text-xs text-neutral-500 italic">No scheduled campaigns active. Click &quot;Schedule New Reminder&quot; to begin.</p>
@@ -505,28 +666,41 @@ export default function SendReminderTab({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {reminders.map((r, i) => {
+                                {groupedReminders.map((r, i) => {
                                     const statusColors =
                                         r.status === 'Sent' ? 'bg-emerald-50 dark:bg-emerald-950/25 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400 font-bold' :
                                         r.status === 'Scheduled' ? 'bg-amber-50 dark:bg-amber-950/25 border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-400 font-bold' :
-                                        r.status === 'Failed' ? 'bg-rose-50 dark:bg-rose-950/25 border-rose-200 dark:border-rose-900 text-rose-705 dark:text-rose-400 font-bold' :
+                                        r.status === 'Failed' ? 'bg-rose-50 dark:bg-rose-950/25 border-rose-200 dark:border-rose-900 text-rose-750 dark:text-rose-450 font-bold' :
                                         'bg-neutral-50 dark:bg-neutral-800 border-neutral-250 dark:border-zinc-700 text-neutral-500 dark:text-zinc-400';
 
-                                    const recipientDisplay =
-                                        r.recipientType === 'new' ? `Manual: ${r.newName || 'Customer'} (${r.newPhone})` :
-                                        r.recipientType === 'groups' ? (() => {
-                                            const customMatch = customGroups.find(cg => cg._id === r.groupName);
-                                            return `Group: ${customMatch ? customMatch.name : r.groupName}`;
-                                        })() :
-                                        r.customer ? `Client: ${r.customer.fullName} (${r.customer.phone})` :
-                                        'Unknown recipient';
+                                    const recipientDisplay = (() => {
+                                        if (r.recipientType === 'groups') {
+                                            const customMatch = customGroups.find(cg => cg._id === r.recipients[0]?.name);
+                                            return (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" style={{ backgroundColor: customMatch?.color }} />
+                                                    <span className="font-bold text-xs text-slate-700 dark:text-zinc-205 text-foreground">Group: {customMatch ? customMatch.name : r.recipients[0]?.name}</span>
+                                                </div>
+                                            );
+                                        }
+                                        if (r.recipients.length > 1) {
+                                            return <MultipleRecipientsBadge recipients={r.recipients} />;
+                                        }
+                                        const single = r.recipients[0] || { name: 'Customer', phone: '' };
+                                        return (
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-slate-800 dark:text-zinc-100 text-xs">{single.name}</span>
+                                                <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono mt-0.5">{single.phone}</span>
+                                            </div>
+                                        );
+                                    })();
 
                                     return (
                                         <tr key={i} className="hover:bg-neutral-50/30 dark:hover:bg-[#1a1a28]/20 transition-all font-medium text-foreground">
                                             <td className="px-5 py-4 font-bold">{r.title}</td>
                                             <td className="px-5 py-4 select-all">{recipientDisplay}</td>
                                             <td className="px-5 py-4 font-mono text-[11px]">{r.templateName}</td>
-                                            <td className="px-5 py-4">{new Date(r.scheduledAt).toLocaleString()}</td>
+                                            <td className="px-5 py-4">{formatDateTime(r.scheduledAt)}</td>
                                             <td className="px-5 py-4">
                                                 {r.repeat?.enabled ? (
                                                     <span className="capitalize text-emerald-600 dark:text-emerald-400 font-bold">Every {r.repeat.interval} {r.repeat.frequency}(s)</span>
@@ -1039,8 +1213,26 @@ export default function SendReminderTab({
                                                 <p className="text-[10px] font-black text-neutral-450 uppercase tracking-widest">Assign Dynamic Template Variables</p>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                                                     {parameters.map((val, idx) => (
-                                                        <Field key={idx} label={`Var {{${idx + 1}}} *`} hint={idx === 0 ? 'Use "{{clientName}}" to auto-insert recipient name' : undefined}>
-                                                            <Input value={val} onChange={e => handleParamChange(idx, e.target.value)} placeholder={`e.g. values`} />
+                                                        <Field key={idx} label={`Var {{${idx + 1}}} *`}>
+                                                            <div className="space-y-1.5">
+                                                                <Input value={val} onChange={e => handleParamChange(idx, e.target.value)} placeholder={`e.g. values`} />
+                                                                <div className="flex flex-wrap gap-1.5">
+                                                                    {[
+                                                                        { label: 'Client Name', value: '{{clientName}}' },
+                                                                        { label: 'Client Phone', value: '{{phone}}' },
+                                                                        { label: 'Client Email', value: '{{email}}' }
+                                                                    ].map(v => (
+                                                                        <button
+                                                                            key={v.value}
+                                                                            type="button"
+                                                                            onClick={() => handleParamChange(idx, v.value)}
+                                                                            className="px-2 py-0.5 rounded-lg border border-border hover:border-emerald-500 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/20 text-[10px] font-bold text-neutral-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                                                        >
+                                                                            + {v.label}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
                                                         </Field>
                                                     ))}
                                                 </div>

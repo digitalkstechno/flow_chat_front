@@ -85,6 +85,15 @@ export default function KeywordRulesTab({
 
     const [rules, setRules] = useState<KwRule[]>([]);
 
+    const handleInsertVar = (val: string) => {
+        setKwForm(f => {
+            const current = f.parametersRaw.trim();
+            if (!current) return { ...f, parametersRaw: val };
+            if (current.endsWith(',')) return { ...f, parametersRaw: `${current} ${val}` };
+            return { ...f, parametersRaw: `${current}, ${val}` };
+        });
+    };
+
     // Load keyword rules on mount / rules updates
     useEffect(() => {
         const rulesList: KwRule[] = [];
@@ -204,7 +213,25 @@ export default function KeywordRulesTab({
                         <Input value={kwForm.lang} onChange={e => setKwForm(f => ({ ...f, lang: e.target.value }))} placeholder="en" className="font-mono text-xs" />
                     </Field>
                     <Field label="Parameters (comma separated)" hint="Dynamic variables to fill like {{1}}, {{2}}. e.g. {{clientName}}">
-                        <Input value={kwForm.parametersRaw} onChange={e => setKwForm(f => ({ ...f, parametersRaw: e.target.value }))} placeholder="e.g. {{clientName}}, invoice" />
+                        <div className="space-y-1.5">
+                            <Input value={kwForm.parametersRaw} onChange={e => setKwForm(f => ({ ...f, parametersRaw: e.target.value }))} placeholder="e.g. {{clientName}}, invoice" />
+                            <div className="flex flex-wrap gap-1">
+                                {[
+                                    { label: 'Client Name', value: '{{clientName}}' },
+                                    { label: 'Client Phone', value: '{{phone}}' },
+                                    { label: 'Client Email', value: '{{email}}' }
+                                ].map(v => (
+                                    <button
+                                        key={v.value}
+                                        type="button"
+                                        onClick={() => handleInsertVar(v.value)}
+                                        className="px-2 py-0.5 rounded-lg border border-border dark:border-zinc-800 hover:border-emerald-500 hover:bg-emerald-50/20 dark:hover:bg-emerald-950/20 text-[10px] font-bold text-neutral-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                                    >
+                                        + {v.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </Field>
                 </div>
                 <div className="flex items-center gap-3 pt-1">
