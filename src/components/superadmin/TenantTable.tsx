@@ -33,13 +33,13 @@ export default function TenantTable({ tenants, onDelete, onView, onEdit, onChang
             setLoadingSlug(slug);
             const res = await impersonateStaff(slug);
             if (res.status === 'Success' && res.token) {
-                // Store in format expected by /[slug]/dashboard.tsx
+                // Store in format expected by /[slug]/whatsapp/chats.tsx
                 localStorage.setItem(`staff_token_${slug}`, res.token);
                 localStorage.setItem(`staff_user_${slug}`, JSON.stringify(res.data));
                 localStorage.setItem(`tenant_name_${slug}`, res.tenant?.clientName || slug);
 
                 // Open staff dashboard in NEW tab
-                window.open(`/${slug}/dashboard`, '_blank');
+                window.open(`/${slug}/whatsapp/chats`, '_blank');
             } else {
                 alert(res.message || 'Failed to impersonate');
             }
