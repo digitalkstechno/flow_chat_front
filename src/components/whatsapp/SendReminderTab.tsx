@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Calendar, Clock, Repeat, ChevronDown, Check, Loader2, Play, Users, Hash, Phone, FileText, Trash2, CheckCircle2, ShieldAlert, X, Plus, ChevronRight, ChevronLeft, Search } from 'lucide-react';
+import { Send, Calendar, Clock, Repeat, ChevronDown, Check, Loader2, Play, Users, Hash, Phone, FileText, Trash2, CheckCircle2, ShieldAlert, X, Plus, ChevronRight, ChevronLeft, Search, MessageSquare } from 'lucide-react';
 import { api } from '@/services/apiClient';
 import LivePreview from './LivePreview';
 import { useConfirm } from '@/context/ConfirmContext';
@@ -51,6 +51,48 @@ interface SendReminderTabProps {
     show: (msg: string, type?: 'success' | 'error' | 'info') => void;
     showModal?: boolean;
     setShowModal?: (v: boolean) => void;
+}
+
+function getContactName(c: any): string {
+    if (!c) return 'Unknown';
+    if (c.profile?.whatsapp?.name) {
+        const pName = c.profile.whatsapp.name;
+        if (typeof pName === 'string' && pName.trim() !== '') return pName;
+    }
+    if (c.name) {
+        if (typeof c.name === 'object') {
+            const fname = c.name.first_name || '';
+            const lname = c.name.last_name || '';
+            const combined = `${fname} ${lname}`.trim();
+            if (combined) return combined;
+        } else if (typeof c.name === 'string') {
+            return c.name;
+        }
+    }
+    const val = c.chat_name || c.whatsapp || c.phone || 'Unknown';
+    return String(val);
+}
+
+function getContactPhone(c: any): string {
+    if (!c) return '';
+    if (c.profile?.whatsapp?.identifier) {
+        return String(c.profile.whatsapp.identifier);
+    }
+    if (c.name?.first_name) {
+        const rawFn = String(c.name.first_name);
+        const cleanFn = rawFn.replace(/[\s\-\(\)\+]/g, '');
+        if (/^\d{8,16}$/.test(cleanFn)) {
+            return rawFn;
+        }
+    }
+    const val = c.whatsapp || c.phone || '';
+    if (c.contact && typeof c.contact === 'object') {
+        return getContactPhone(c.contact);
+    }
+    if (c.customer && typeof c.customer === 'object') {
+        return getContactPhone(c.customer);
+    }
+    return String(val);
 }
 
 export default function SendReminderTab({
@@ -122,8 +164,15 @@ export default function SendReminderTab({
 
     // Form States
     const [title, setTitle] = useState('');
-    const [recipientType, setRecipientType] = useState<'customers' | 'groups' | 'new'>('customers');
+    const [recipientType, setRecipientType] = useState<'customers' | 'groups' | 'new' | 'whatsapp'>('customers');
     const [selectedClientId, setSelectedClientId] = useState('');
+
+    // WhatsApp Contacts state
+    const [waContacts, setWaContacts] = useState<any[]>([]);
+    const [waContactsLoading, setWaContactsLoading] = useState(false);
+    const [waContactsError, setWaContactsError] = useState('');
+    const [selectedWaContacts, setSelectedWaContacts] = useState<{ name: string; phone: string }[]>([]);
+    const [waSearchQuery, setWaSearchQuery] = useState('');
     const [selectedGroupName, setSelectedGroupName] = useState('All Clients');
     const [newName, setNewName] = useState('');
     const [newPhone, setNewPhone] = useState('');
@@ -265,6 +314,17 @@ export default function SendReminderTab({
                     };
                     return api.post(`/tenants/${slug}/whatsapp-reminders`, payload);
                 }));
+            } else if (recipientType === 'whatsapp') {
+                // Send one reminder per selected WhatsApp contact
+                await Promise.all(selectedWaContacts.map(contact => {
+                    const payload = {
+                        ...basePayload,
+                        recipientType: 'new',
+                        newName: contact.name,
+                        newPhone: contact.phone,
+                    };
+                    return api.post(`/tenants/${slug}/whatsapp-reminders`, payload);
+                }));
             } else {
                 const payload = {
                     ...basePayload,
@@ -287,6 +347,8 @@ export default function SendReminderTab({
             setSearchQuery('');
             setNewName('');
             setNewPhone('');
+            setSelectedWaContacts([]);
+            setWaSearchQuery('');
             setTemplateName('');
             setScheduledDate('');
             setScheduledTime('');
@@ -334,12 +396,76 @@ export default function SendReminderTab({
         }
     };
 
+    // WhatsApp contacts fetch
+    const fetchWaContacts = async () => {
+        if (!slug) return;
+        setWaContactsLoading(true);
+        setWaContactsError('');
+        try {
+            const res = await api.get(`/tenants/${slug}/whatsapp-chats`, { params: { page: 1, limit: 1000 } });
+            if (res.data.success) {
+                const responseData = res.data.data;
+                let list: any[] = [];
+                if (Array.isArray(responseData)) {
+                    list = responseData;
+                } else if (responseData && Array.isArray(responseData.data)) {
+                    list = responseData.data;
+                } else if (responseData && Array.isArray(responseData.chats)) {
+                    list = responseData.chats;
+                } else if (responseData && Array.isArray(responseData.contacts)) {
+                    list = responseData.contacts;
+                } else if (res.data && Array.isArray(res.data.data)) {
+                    list = res.data.data;
+                } else if (res.data && Array.isArray(res.data.chats)) {
+                    list = res.data.chats;
+                } else if (res.data && Array.isArray(res.data.contacts)) {
+                    list = res.data.contacts;
+                }
+                setWaContacts(list || []);
+            } else {
+                setWaContactsError('Failed to load WhatsApp contacts.');
+            }
+        } catch (err: any) {
+            const msg = err.response?.data?.message || 'Could not load WhatsApp contacts.';
+            setWaContactsError(msg);
+        } finally {
+            setWaContactsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (recipientType === 'whatsapp' && waContacts.length === 0 && !waContactsLoading) {
+            fetchWaContacts();
+        }
+    }, [recipientType]);
+
+    const toggleWaContact = (contact: any) => {
+        const phone = getContactPhone(contact);
+        const name = getContactName(contact);
+        if (!phone) return;
+        setSelectedWaContacts(prev => {
+            const exists = prev.find(c => c.phone === phone);
+            if (exists) return prev.filter(c => c.phone !== phone);
+            return [...prev, { name, phone }];
+        });
+    };
+
+    const filteredWaContacts = (Array.isArray(waContacts) ? waContacts : []).filter(c => {
+        const name = getContactName(c);
+        const phone = getContactPhone(c);
+        return (
+            name.toLowerCase().includes(waSearchQuery.toLowerCase()) ||
+            phone.includes(waSearchQuery)
+        );
+    });
+
     // Step validation checks
     const isStep1Valid = title.trim() !== '' && recipientType;
     const isStep2Valid = (() => {
         if (recipientType === 'customers') return selectedClientIds.length > 0;
         if (recipientType === 'groups') return selectedGroupName !== '' && hasGroupMembers;
         if (recipientType === 'new') return newName.trim() !== '' && newPhone.trim() !== '';
+        if (recipientType === 'whatsapp') return selectedWaContacts.length > 0;
         return false;
     })();
     const isStep3Valid = templateName !== '' && scheduledDate !== '' && scheduledTime !== '' && (!repeatEnabled || repeatInterval >= 1) && (!['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat) || headerLink !== '');
@@ -444,7 +570,10 @@ export default function SendReminderTab({
                                 <h3 className="text-base font-bold text-foreground">Schedule Message Campaign</h3>
                                 <p className="text-[11px] text-neutral-400 dark:text-neutral-500 font-semibold mt-0.5">
                                     {step === 1 && 'Step 1 of 3 — Campaign Details & Recipient Type'}
-                                    {step === 2 && 'Step 2 of 3 — Select Targets'}
+                                    {step === 2 && recipientType === 'customers' && 'Step 2 of 3 — Select CRM Clients'}
+                                    {step === 2 && recipientType === 'groups' && 'Step 2 of 3 — Select Customer Group'}
+                                    {step === 2 && recipientType === 'new' && 'Step 2 of 3 — Manual Recipient Entry'}
+                                    {step === 2 && recipientType === 'whatsapp' && 'Step 2 of 3 — Select WhatsApp Contacts'}
                                     {step === 3 && 'Step 3 of 3 — Message Template & Date Settings'}
                                 </p>
                             </div>
@@ -474,11 +603,12 @@ export default function SendReminderTab({
 
                                         <div className="space-y-2">
                                             <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400">Recipient Type *</label>
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                                 {[
                                                     { id: 'customers', label: 'Select Clients', icon: <Users size={16} />, desc: 'Target individual CRM clients' },
                                                     { id: 'groups', label: 'Customer Group', icon: <Hash size={16} />, desc: 'Bulk send to active lists' },
-                                                    { id: 'new', label: 'Manual Entry', icon: <Phone size={16} />, desc: 'Type number manually' }
+                                                    { id: 'new', label: 'Manual Entry', icon: <Phone size={16} />, desc: 'Type number manually' },
+                                                    { id: 'whatsapp', label: 'WhatsApp Contact', icon: <MessageSquare size={16} />, desc: 'Pick from WA contact list' }
                                                 ].map(target => (
                                                     <button key={target.id} type="button" onClick={() => setRecipientType(target.id as any)}
                                                         className={`flex flex-col items-start gap-2 p-3.5 border-2 rounded-xl text-left transition-all ${
@@ -724,6 +854,110 @@ export default function SendReminderTab({
                                                 <Field label="Recipient Mobile Phone *">
                                                     <Input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="e.g. 919974401999" />
                                                 </Field>
+                                            </div>
+                                        )}
+
+                                        {recipientType === 'whatsapp' && (
+                                            <div className="space-y-4">
+                                                {/* Search + controls */}
+                                                <div className="flex flex-col sm:flex-row gap-3">
+                                                    <div className="relative flex-1">
+                                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Search by name or phone..."
+                                                            value={waSearchQuery}
+                                                            onChange={e => setWaSearchQuery(e.target.value)}
+                                                            className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl py-2.5 pl-10 pr-4 text-xs outline-none focus:ring-2 focus:ring-emerald-500/25 transition-all font-medium text-slate-800 dark:text-zinc-200"
+                                                        />
+                                                    </div>
+                                                    <div className="flex gap-2 shrink-0">
+                                                        <button type="button"
+                                                            onClick={() => {
+                                                                const newSel = filteredWaContacts.map(c => ({
+                                                                    name: getContactName(c),
+                                                                    phone: getContactPhone(c)
+                                                                })).filter(item => item.phone);
+                                                                setSelectedWaContacts(prev => {
+                                                                    const existing = [...prev];
+                                                                    newSel.forEach(ns => {
+                                                                        if (!existing.find(e => e.phone === ns.phone)) existing.push(ns);
+                                                                    });
+                                                                    return existing;
+                                                                });
+                                                            }}
+                                                            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-bold rounded-xl transition-all">
+                                                            Select All ({filteredWaContacts.length})
+                                                        </button>
+                                                        <button type="button" onClick={() => setSelectedWaContacts([])}
+                                                            className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/20 text-rose-600 dark:text-rose-450 text-xs font-bold rounded-xl transition-all">
+                                                            Clear All
+                                                        </button>
+                                                        <button type="button" onClick={fetchWaContacts} disabled={waContactsLoading}
+                                                            className="px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-xl transition-all disabled:opacity-50">
+                                                            {waContactsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : '↻'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Contact list */}
+                                                <div className="max-h-[40vh] overflow-y-auto border border-border rounded-2xl p-3 bg-slate-50/50 dark:bg-neutral-950/20 scrollbar-thin space-y-1.5">
+                                                    {waContactsLoading ? (
+                                                        <div className="flex items-center justify-center py-10 gap-2 text-neutral-400">
+                                                            <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+                                                            <span className="text-xs font-medium">Loading WhatsApp contacts...</span>
+                                                        </div>
+                                                    ) : waContactsError ? (
+                                                        <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
+                                                            <p className="text-xs text-red-500 font-medium">{waContactsError}</p>
+                                                            <button type="button" onClick={fetchWaContacts}
+                                                                className="text-xs text-emerald-600 hover:underline font-bold">Retry</button>
+                                                        </div>
+                                                    ) : filteredWaContacts.length === 0 ? (
+                                                        <p className="text-xs text-slate-400 font-medium italic text-center py-8">
+                                                            {waContacts.length === 0 ? 'No WhatsApp contacts found. Make sure your WhatsApp CRM API is configured.' : 'No contacts match your search.'}
+                                                        </p>
+                                                    ) : (
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                                            {filteredWaContacts.map((c, idx) => {
+                                                                const phone = getContactPhone(c);
+                                                                const name = getContactName(c);
+                                                                const isSelected = !!selectedWaContacts.find(s => s.phone === phone);
+                                                                return (
+                                                                    <label key={idx} className={`flex items-center gap-2.5 p-2.5 border rounded-xl cursor-pointer transition-all select-none ${
+                                                                        isSelected
+                                                                            ? 'border-emerald-500 bg-emerald-50/10 dark:bg-emerald-950/5'
+                                                                            : 'border-slate-100 dark:border-zinc-800 hover:border-slate-200 hover:bg-slate-50/30'
+                                                                    }`}>
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isSelected}
+                                                                            onChange={() => toggleWaContact(c)}
+                                                                            className="rounded border-gray-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500/30 w-3.5 h-3.5"
+                                                                        />
+                                                                        <div className="flex items-center gap-2 min-w-0">
+                                                                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-white text-[10px] font-black shrink-0">
+                                                                                {name.slice(0, 2).toUpperCase()}
+                                                                            </div>
+                                                                            <div className="min-w-0 leading-none">
+                                                                                <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{name}</p>
+                                                                                <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium mt-0.5">{phone}</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </label>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Selected indicator */}
+                                                <div className="flex items-center justify-between text-xs font-bold bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-500/20 px-3.5 py-2.5 rounded-xl">
+                                                    <span className="text-emerald-800 dark:text-emerald-450">{selectedWaContacts.length} WhatsApp contact{selectedWaContacts.length !== 1 ? 's' : ''} selected</span>
+                                                    {selectedWaContacts.length > 0 && (
+                                                        <button type="button" onClick={() => setSelectedWaContacts([])} className="text-slate-400 hover:text-red-500 hover:underline text-[10px]">Clear All</button>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>

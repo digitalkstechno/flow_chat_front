@@ -118,6 +118,18 @@ export default function TenantLayout({ children, title = 'Tenant Portal' }: Prop
             ]
         },
         {
+            groupName: 'CLIENTS',
+            items: [
+                {
+                    label: 'Clients',
+                    path: `/${slug}/clients`,
+                    matchPath: '/[slug]/clients',
+                    icon: <Users size={20} />,
+                    allowedRoles: ['admin', 'manager']
+                }
+            ]
+        },
+        {
             groupName: 'ADMINISTRATION',
             items: [
                 {

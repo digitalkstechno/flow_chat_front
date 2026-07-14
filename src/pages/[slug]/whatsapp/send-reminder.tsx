@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import TenantLayout from '@/components/tenant/TenantLayout';
 import { Loader2, AlertCircle, CheckCircle2, Plus } from 'lucide-react';
-import { getWhatsappTemplates } from '@/services/tenantService';
+import { getWhatsappTemplates, getClients } from '@/services/tenantService';
 import SendReminderTab from '@/components/whatsapp/SendReminderTab';
 
 function Toast({ msg, type }: { msg: string; type: 'success' | 'error' | 'info' }) {
@@ -49,15 +49,23 @@ export default function SendReminderPage() {
         setError('');
         setConfigMissing(false);
         try {
-            const settingsRes = await getWhatsappTemplates(slug).catch(err => {
-                const msg = err.response?.data?.message || err.message || '';
-                if (msg.toLowerCase().includes('not fully configured') || msg.toLowerCase().includes('not configured')) {
-                    setConfigMissing(true);
-                }
-                throw err;
-            });
+            const [settingsRes, clientsRes] = await Promise.allSettled([
+                getWhatsappTemplates(slug).catch(err => {
+                    const msg = err.response?.data?.message || err.message || '';
+                    if (msg.toLowerCase().includes('not fully configured') || msg.toLowerCase().includes('not configured')) {
+                        setConfigMissing(true);
+                    }
+                    throw err;
+                }),
+                getClients(slug).catch(() => ({ success: false, data: [] }))
+            ]);
 
-            if (settingsRes.success) setTemplates(settingsRes.data || []);
+            if (settingsRes.status === 'fulfilled' && settingsRes.value?.success) {
+                setTemplates(settingsRes.value.data || []);
+            }
+            if (clientsRes.status === 'fulfilled' && clientsRes.value?.success) {
+                setClients(clientsRes.value.data || []);
+            }
         } catch (err: any) {
             const msg = err.response?.data?.message || err.message || 'Failed to initialize page.';
             if (!msg.toLowerCase().includes('not fully configured') && !msg.toLowerCase().includes('not configured')) {

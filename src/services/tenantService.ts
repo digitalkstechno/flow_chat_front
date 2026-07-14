@@ -71,3 +71,30 @@ export const getWhatsappChatMessages = (slug: string, chatId: string, page = 1, 
 
 export const sendWhatsappChatMessage = (slug: string, chatId: string, data: { to: string; message: string }) =>
     api.post(`/tenants/${slug}/whatsapp-chats/${chatId}/send`, data).then(res => res.data);
+
+// ─── Clients ──────────────────────────────────────────────────────────────────
+
+export interface Client {
+    _id: string;
+    fullName: string;
+    phone: string;
+    email?: string;
+    group?: { _id: string; name: string; color: string } | null;
+    addedOn?: string;
+    createdAt?: string;
+}
+
+export const getClients = (slug: string) =>
+    api.get(`/tenants/${slug}/clients`).then(res => res.data);
+
+export const createClient = (slug: string, data: { fullName: string; phone: string; email?: string; group?: string }) =>
+    api.post(`/tenants/${slug}/clients`, data).then(res => res.data);
+
+export const updateClient = (slug: string, id: string, data: Partial<{ fullName: string; phone: string; email: string; group: string | null }>) =>
+    api.put(`/tenants/${slug}/clients/${id}`, data).then(res => res.data);
+
+export const deleteClient = (slug: string, id: string) =>
+    api.delete(`/tenants/${slug}/clients/${id}`).then(res => res.data);
+
+export const bulkCreateClients = (slug: string, clients: any[]) =>
+    api.post(`/tenants/${slug}/clients/bulk`, clients).then(res => res.data);
